@@ -1,0 +1,2 @@
+gnome-terminal -e "gdb --args ../bin/followPoint"
+
