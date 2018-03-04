@@ -32,9 +32,9 @@ __global__ void mach_bmp_kernel(uint8_t *img_in,uint8_t *img_out, uint8_t *comp)
 
 	__syncthreads();
 	if(compIdx == 0){
-		uint8_t gray = (uint8_t) (div[0] / (COMP_HEIGHT * COMP_WIDTH));
+		float gray = (div[0] / (COMP_HEIGHT * COMP_WIDTH));
 
-		img_out[index] = gray; 
+		img_out[index] =(uint8_t) gray; 
 
 	}
 }

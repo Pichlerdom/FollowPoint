@@ -48,8 +48,8 @@ int allocCamera(ImgCont *imgCont, uint8_t **framebuf){
 	fmt.type				= V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	fmt.fmt.pix.width		= WEBCAM_FRAME_WIDTH;
 	fmt.fmt.pix.height		= WEBCAM_FRAME_HEIGHT;
-	fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_OV518;
-	fmt.fmt.pix.field		= V4L2_FIELD_INTERLACED;
+	fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+	fmt.fmt.pix.field		= V4L2_FIELD_NONE;
 
 	printf("%d\n",fmt.fmt.pix.pixelformat);
 	if (-1 == xioctl(fd_cam, VIDIOC_S_FMT, &fmt)){
@@ -150,8 +150,8 @@ void writeframebuf(int fd, uint8_t *framebuf,int framebufsize, ImgCont *imgCont)
 	src_fmt.type				= V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	src_fmt.fmt.pix.width		= WEBCAM_FRAME_WIDTH;
 	src_fmt.fmt.pix.height		= WEBCAM_FRAME_HEIGHT;
-	src_fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_OV518;
-	src_fmt.fmt.pix.field		= V4L2_FIELD_INTERLACED;
+	src_fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+	src_fmt.fmt.pix.field		= V4L2_FIELD_NONE;
 
 
 	dest_fmt.type				= V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -187,7 +187,10 @@ void readframe(ImgCont *imgCont, int fd_camera, uint8_t *framebuf){
 	pthread_mutex_lock(&(imgCont->imgMtx));	
 
 	printf("bytesused: %d\n",buf.bytesused);
-	writeframebuf(fd_camera, framebuf, buf.bytesused, imgCont);
+	//writeframebuf(fd_camera, framebuf, buf.bytesused, imgCont);
+
+	convert_YUYV_to_RGB(framebuf, imgCont->img, WEBCAM_FRAME_WIDTH, WEBCAM_FRAME_HEIGHT);
+
 
 	if(imgCont->control.detection){
 		cuda_test(imgCont,imgCont->comp);
@@ -199,5 +202,54 @@ void readframe(ImgCont *imgCont, int fd_camera, uint8_t *framebuf){
 	{
 		perror("VIDIOC_QBUF");
 		return ;
+	}
+}
+
+
+void convert_YUYV_to_RGB(uint8_t *imgyuyv, uint8_t *imgrgb, int witdh, int 
+		height){
+	for(int i = 0; i < (witdh * height)/2; i++){
+		int yuyvIdx = i * 4;
+		int rgbIdx = (i * 2) * 3;
+		float y1 =(float) imgyuyv[yuyvIdx + 0];
+		float u  =(float) imgyuyv[yuyvIdx + 1] - 128;
+		float y2 =(float) imgyuyv[yuyvIdx + 2];
+		float v  =(float) imgyuyv[yuyvIdx + 3] - 128;
+		
+		float inter1 = (1.402f * v);
+		float inter2 = (0.344f * u);
+		float inter3 = (0.714f * v);
+		float inter4 = (1.772f * u);
+		float rgb[3];
+
+		rgb[0] = (y1 + inter1);
+		rgb[1] = (y1 - inter2 - inter3);
+		rgb[2] = (y1 + inter4);
+		
+		if (rgb[0] < 0){ rgb[0] = 0; } 
+		if (rgb[1] < 0){ rgb[1] = 0; } 
+		if (rgb[2] < 0){ rgb[2] = 0; }
+		if (rgb[0] > 255 ){ rgb[0] = 255; } 
+		if (rgb[1] > 255) { rgb[1] = 255; } 
+		if (rgb[2] > 255) { rgb[2] = 255; }
+
+		imgrgb[rgbIdx + 0] = (uint8_t)rgb[0]; 		      	
+		imgrgb[rgbIdx + 1] = (uint8_t)rgb[1];   	      	
+		imgrgb[rgbIdx + 2] = (uint8_t)rgb[2];   	      	
+
+		rgb[0] = (y2 + inter1);
+		rgb[1] = (y2 - inter2 - inter3);
+		rgb[2] = (y2 + inter4);
+		
+		if (rgb[0] < 0){ rgb[0] = 0; } 
+		if (rgb[1] < 0){ rgb[1] = 0; } 
+		if (rgb[2] < 0){ rgb[2] = 0; }
+		if (rgb[0] > 255 ){ rgb[0] = 255; } 
+		if (rgb[1] > 255) { rgb[1] = 255; } 
+		if (rgb[2] > 255) { rgb[2] = 255; }
+
+		imgrgb[rgbIdx + 3] = (uint8_t)rgb[0]; 		      	
+		imgrgb[rgbIdx + 4] = (uint8_t)rgb[1];   	      	
+		imgrgb[rgbIdx + 5] = (uint8_t)rgb[2];
 	}
 }

@@ -4,20 +4,21 @@
 #define DIR_CW 0
 #define DIR_CCW 1
 
-#define PIN_IN_1 2
-#define PIN_E 5
+#define PIN_IN_1 9
+#define PIN_IN_2 10
+#define PIN_E 4
 
-#define PIN_SERVO 9 
+#define PIN_SERVO 5
 
-#define MIN_SERVO_POS 10
-#define MAX_SERVO_POS 250
+#define MIN_SERVO_POS 50
+#define MAX_SERVO_POS 200
 
 
 Servo myservo;
 byte servopos = 95;
 
-int motordir = 0;
-int motorontime = 3;
+int motordir = DIR_CW;
+int motorspeed = 100;
 
 void setup(){
   
@@ -25,25 +26,23 @@ void setup(){
   Serial.begin(115200);
   
   pinMode(PIN_IN_1, OUTPUT);
+  pinMode(PIN_IN_2, OUTPUT);
   //pinMode(PIN_E, OUTPUT);
   
-  startupmotion();
-
+  start_motor();
 }
 
 void loop(){
   if(servopos > MIN_SERVO_POS && servopos < MAX_SERVO_POS){
       myservo.write(servopos);
   }
-  
-  if(motorontime > 0){
-    motorontime --;
-   
-    set_rotation_dir(motordir);
-    start_motor();
+  if(motorspeed < 20){
+    stop_motor();
   }else{
-    soft_stop();
+    start_motor();
   }
+  setmotorspeed();
+  motorspeed--;
   delay(1);
 }
 
@@ -57,51 +56,31 @@ void serialEvent() {
     
     if(dx > 0){
       motordir = 0;
-      motorontime = dy;
+      motorspeed = dx;
     }else if(dx < 0){
       motordir = 1;
-      motorontime = dy * -1;
+      motorspeed = dx * -1;
     }else{
-      motorontime = 0;  
+      motorspeed = 0;  
     }
-    Serial.write(dx);
-    Serial.write(dy);
   }
 }
 
-void startupmotion(){
-  
-  myservo.write(servopos);
-  
-  set_rotation_dir(DIR_CW);
-  start_motor();
-  delay(50);
-  soft_stop();
-  
-  delay(100);
-  
-  set_rotation_dir(DIR_CCW);
-  start_motor();
-  delay(50);
-  soft_stop();
-}
-
-
-void set_rotation_dir(int dir){
-  if(DIR_CW == dir)
+void setmotorspeed(){
+  if(DIR_CW == motordir)
   {
-    digitalWrite(PIN_IN_1, LOW);
-  }else{ 
     digitalWrite(PIN_IN_1, HIGH);
+    analogWrite(PIN_IN_2,motorspeed);
+  }else{
+    digitalWrite(PIN_IN_2, HIGH);
+    analogWrite(PIN_IN_1,motorspeed);
   }
 }
 
 void start_motor(){
   digitalWrite(PIN_E, HIGH);
-
 }
 
-void soft_stop(){
+void stop_motor(){
   digitalWrite(PIN_E, LOW);
-
 }

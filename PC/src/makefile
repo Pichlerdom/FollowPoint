@@ -8,7 +8,7 @@ NVCC = nvcc
 CFLAGS =-g -Wall $(SDL2CFLAGS)
 
 #define cuda compiler flags
-NVCFLAGS =-g -lineinfo -maxrregcount=0 -gencode=arch=compute_50,code=\"sm_50,compute_50\" $(SDL2CFLAGS)
+NVCFLAGS =-g -lineinfo -maxrregcount=0 -gencode=arch=compute_50,code=\"sm_50,compute_50\" $(SDL2CFLAGS) 
 
 #define library paths
 LFLAGS = -L"/usr/lib/x86_64-linux-gnu" 
@@ -38,9 +38,9 @@ MAIN = ../bin/followPoint
 # add .cu suffix so we can compile cuda files
 .SUFFIXES :.cu .cpp
 
-.PHONY:all clean 
+.PHONY:all 
 
-all:$(MAIN)
+all:$(MAIN) clean
 
 
 $(MAIN): $(OBJS)

@@ -4,7 +4,7 @@
 
 
 
-#define FPS 10
+#define FPS 33
 #define MS_PER_FRAME 1000/FPS
 
 typedef struct{

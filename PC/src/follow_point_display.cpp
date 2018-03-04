@@ -40,8 +40,6 @@ void* main_display_loop(void *arg){
 								imgCont->comp[compIdx] = imgCont->img[pixIdx];
 								imgCont->comp[compIdx + 1] = imgCont->img[pixIdx + 1];
 								imgCont->comp[compIdx + 2] = imgCont->img[pixIdx + 2];
-							}else{
-							
 							}
 						}
 					}
@@ -86,8 +84,14 @@ void* main_display_loop(void *arg){
 			SDL_SetRenderDrawColor( display->renderer, 0xFF, 0x00, 0xFF, 0xFF);
 			SDL_RenderDrawRect(display->renderer, &rect);
 		
+					imgCont->laser.dx = 0;
+					imgCont->laser.dy = 0;
 		}
 		pthread_mutex_unlock(&(imgCont->imgMtx));
+		
+
+		SDL_SetRenderDrawColor( display->renderer, 0xFF, 0x00, 0x00, 0xFF);
+		draw_circle_at(display, 2, imgCont->laser.x, imgCont->laser.y);
 		//Update screen
 		SDL_RenderPresent( display->renderer );
 

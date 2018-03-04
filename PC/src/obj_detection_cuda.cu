@@ -2,6 +2,9 @@
 
 
 #include "obj_detection_cuda.h"
+
+#include "obj_detection.h"
+
 void cuda_test(ImgCont *imgCont,uint8_t *comp){
 	uint8_t *d_img_in;
 	uint8_t *d_img_out;
@@ -11,7 +14,7 @@ void cuda_test(ImgCont *imgCont,uint8_t *comp){
 
 	uint8_t *img_out = (uint8_t*) malloc(imgsize/3);
 	dim3 block(COMP_WIDTH,COMP_HEIGHT);
-	dim3 grid(WEBCAM_FRAME_WIDTH,WEBCAM_FRAME_HEIGHT);
+	dim3 grid(WEBCAM_FRAME_WIDTH/GRID_SIZE_X,WEBCAM_FRAME_HEIGHT/GRID_SIZE_Y);
 	
 	cudaMalloc(&d_img_in, imgsize);
 	cudaMalloc(&d_img_out, imgsize/3);
@@ -34,11 +37,12 @@ void cuda_test(ImgCont *imgCont,uint8_t *comp){
 			   (void *)d_img_out,
 				imgsize/3,
 			   cudaMemcpyDeviceToHost);
-	
+
 	find_delta(0, img_out, imgCont);
-
-    update_comp(imgCont);
-
+	/*f(	imgCont->laser.x != 0 &&
+		imgCont->laser.y != 0){
+		update_comp(imgCont);
+	}*/
 	free(img_out);
 	cudaFree(d_img_out);
 	cudaFree(d_comp);
@@ -49,8 +53,8 @@ void cuda_test(ImgCont *imgCont,uint8_t *comp){
 
 
 void update_comp(ImgCont *imgCont){
-	int foundx = imgCont->laser.x - COMP_WIDTH/2;
-	int foundy = imgCont->laser.y - COMP_HEIGHT/2;
+	int foundx = imgCont->laser.x - (COMP_WIDTH/2);
+	int foundy = imgCont->laser.y - (COMP_HEIGHT/2);
 	for(int y = 0; y < COMP_HEIGHT; y++){
 		for(int x = 0 ; x < COMP_WIDTH; x++){
 			int compIdx = ((y * COMP_WIDTH) + x)*3;

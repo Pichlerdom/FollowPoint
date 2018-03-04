@@ -6,4 +6,6 @@
 
 void find_delta(int fd, uint8_t *img_out, ImgCont *imgCont);
 
+void blur(uint8_t *img);
+
 #endif
