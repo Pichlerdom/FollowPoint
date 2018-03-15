@@ -1,14 +1,11 @@
 
-#include "followPoint.h"
 #include "webcam_interface.h"
-#include "obj_detection.h"
-#include "serial_interface.h"
-#include "obj_detection_cuda.h"
-
 #include <stdint.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <stdio.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -16,24 +13,27 @@
 #include <sys/mman.h>
 
 #include <linux/videodev2.h>
-#include <libv4lconvert.h>
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
 
-static int xioctl(int fd, int request, void *arg)
-{
-    int r;
-	do r = ioctl (fd, request, arg);
-	while (-1 == r && EINTR == errno);
-	return r;
-}
+#define WEBCAM_FRAMERATE 30
 
-int allocCamera(ImgCont *imgCont, uint8_t **framebuf){
+//file_name		->		Name of video camera file
+//widht:height	->		open_camera will try to set the frame size to width:height.
+//						If width:height is not supported by camera width:height will
+//						be set to the closest supported value.
+//frame_buf		->		Buffer that holdes the video data in yuyv420 will be used by fill_frame_buf.
+//						and convert_YUYV_to_RGB.
+//						Will be allocated by open_camera.
+//frame_buf_size->		Size of the frame buffer. Set by open_camera. 
+// returns the file handle
+// 1 on error
+int open_camera(char *file_name, int *width, int *height,uint8_t **frame_buf, int *frame_buf_size){
 	struct v4l2_capability caps = {0};
 	struct v4l2_format fmt = {0};
 	struct v4l2_buffer buf = {0};
 
-	int fd_cam = open(DEFAULT_VIDEO_DEVICE, O_RDWR);
+	int fd_cam = open(file_name, O_RDWR);
 
 	if(-1 == xioctl(fd_cam, VIDIOC_QUERYCAP, &caps)){
 		perror("VIDIOC_QUERYCAP");
@@ -45,13 +45,12 @@ int allocCamera(ImgCont *imgCont, uint8_t **framebuf){
 		exit(1);
 	}
 	
-	fmt.type				= V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	fmt.fmt.pix.width		= WEBCAM_FRAME_WIDTH;
-	fmt.fmt.pix.height		= WEBCAM_FRAME_HEIGHT;
-	fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+	fmt.type			= V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	fmt.fmt.pix.width		= *width;
+	fmt.fmt.pix.height		= *height;
+	fmt.fmt.pix.pixelformat 	= V4L2_PIX_FMT_YUYV;
 	fmt.fmt.pix.field		= V4L2_FIELD_NONE;
 
-	printf("%d\n",fmt.fmt.pix.pixelformat);
 	if (-1 == xioctl(fd_cam, VIDIOC_S_FMT, &fmt)){
 		perror("Setting Pixel Format");
 		return 1;
@@ -61,7 +60,11 @@ int allocCamera(ImgCont *imgCont, uint8_t **framebuf){
 		perror("Setting Pixel Format");
 		return 1;
 	}
-	printf("%d\n",fmt.fmt.pix.pixelformat);
+	
+	if(!set_framerate(fd_cam, WEBCAM_FRAMERATE)){
+		perror("Could not set framerate");
+	}	
+
 
 	struct v4l2_requestbuffers req = {0};
 	req.count = 1;
@@ -84,11 +87,12 @@ int allocCamera(ImgCont *imgCont, uint8_t **framebuf){
 		return 1;
 	}
 
-	*framebuf = (uint8_t*) mmap (NULL, buf.length,
+	*frame_buf = (uint8_t*) mmap (NULL, buf.length,
 					PROT_READ | PROT_WRITE,	
 					MAP_SHARED, 
 					fd_cam, buf.m.offset);
 	
+	*frame_buf_size = buf.length;
 
 
 	if(-1 == xioctl(fd_cam, VIDIOC_QBUF, &buf))
@@ -104,73 +108,14 @@ int allocCamera(ImgCont *imgCont, uint8_t **framebuf){
 	}
 
 	return fd_cam;
-	
-
 }
 
-void closeCamera(int fd_cam){
-	close(fd_cam);
+void close_camera(int fd_camera){
+	close(fd_camera);
 }
 
+void fill_frame_buf_yuyv(int fd_camera, uint8_t *frame_buf){
 
-void *main_capture_loop(void *arg){
-	ImgCont *imgCont = (ImgCont*) arg;
-
-	uint8_t *framebuf;
-	int fd_camera = allocCamera(imgCont, &framebuf);
-
-	int curTime = SDL_GetTicks();
-	int deltaTime = 0;
-
-	int fd_serial = open_com_port("/dev/ttyACM0");
-
-	while(imgCont->control.capture){
-
-		curTime = SDL_GetTicks();
-
-		readframe(imgCont, fd_camera, framebuf);
-
-		write_delta(fd_serial, imgCont->laser.dx, imgCont->laser.dy);
-
-		deltaTime = SDL_GetTicks() - curTime;
-		printf("capture time %d \n", deltaTime); 
-	}
-	
-
-	closeCamera(fd_camera);
-	return NULL;
-
-}
-
-void writeframebuf(int fd, uint8_t *framebuf,int framebufsize, ImgCont *imgCont){
-	struct v4l2_format dest_fmt, src_fmt;
-	CLEAR(dest_fmt);
-	CLEAR(src_fmt);
-	
-	src_fmt.type				= V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	src_fmt.fmt.pix.width		= WEBCAM_FRAME_WIDTH;
-	src_fmt.fmt.pix.height		= WEBCAM_FRAME_HEIGHT;
-	src_fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
-	src_fmt.fmt.pix.field		= V4L2_FIELD_NONE;
-
-
-	dest_fmt.type				= V4L2_BUF_TYPE_VIDEO_CAPTURE;
-	dest_fmt.fmt.pix.width		= WEBCAM_FRAME_WIDTH;
-	dest_fmt.fmt.pix.height		= WEBCAM_FRAME_HEIGHT;
-	dest_fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_RGB24;
-	dest_fmt.fmt.pix.field		= V4L2_FIELD_INTERLACED;
-
-	struct v4lconvert_data *conv_data = v4lconvert_create(fd);
-	int byteswriten = v4lconvert_convert(	conv_data,
-						&src_fmt, &dest_fmt,
-						framebuf, framebufsize, 
-						imgCont->img, WEBCAM_FRAME_WIDTH * WEBCAM_FRAME_HEIGHT * 3 * sizeof(uint8_t));	
-	printf("byteswriten:%d\n",byteswriten);
-	v4lconvert_destroy(conv_data);
-
-}
-
-void readframe(ImgCont *imgCont, int fd_camera, uint8_t *framebuf){
 	struct v4l2_buffer buf;
 	buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 	buf.memory = V4L2_MEMORY_MMAP;
@@ -184,20 +129,6 @@ void readframe(ImgCont *imgCont, int fd_camera, uint8_t *framebuf){
 		return ;
 	}
 
-	pthread_mutex_lock(&(imgCont->imgMtx));	
-
-	printf("bytesused: %d\n",buf.bytesused);
-	//writeframebuf(fd_camera, framebuf, buf.bytesused, imgCont);
-
-	convert_YUYV_to_RGB(framebuf, imgCont->img, WEBCAM_FRAME_WIDTH, WEBCAM_FRAME_HEIGHT);
-
-
-	if(imgCont->control.detection){
-		cuda_test(imgCont,imgCont->comp);
-	}
-	
-	pthread_mutex_unlock(&(imgCont->imgMtx));
-
 	if(-1 == xioctl(fd_camera , VIDIOC_QBUF, &buf))
 	{
 		perror("VIDIOC_QBUF");
@@ -205,7 +136,44 @@ void readframe(ImgCont *imgCont, int fd_camera, uint8_t *framebuf){
 	}
 }
 
+void fill_read_frame_rgb(int fd_camera, uint8_t *frame_buf, uint8_t *imgrgb, int width, int height){
+	
+	struct v4l2_buffer buf;
+	buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+	buf.memory = V4L2_MEMORY_MMAP;
+	buf.index = 0;
 
+	fd_set fds;
+	FD_ZERO(&fds);
+	FD_SET(fd_camera, &fds);
+	struct timeval tv = {0};
+	tv.tv_sec = 2;
+	int r = select(fd_camera + 1, &fds, NULL, NULL, &tv);
+	if (-1 == r) {
+		perror("Waiting for Frame");
+		return ;
+	}
+
+
+	if(-1 == xioctl(fd_camera, VIDIOC_DQBUF, &buf))
+	{
+		perror("VIDIOC_QDBUF");
+		return ;
+	}
+
+	convert_YUYV_to_RGB(frame_buf, imgrgb, width,height);
+	
+
+	
+	if(-1 == xioctl(fd_camera , VIDIOC_QBUF, &buf))
+	{
+		perror("VIDIOC_QBUF");
+		return ;
+	}
+
+}
+
+//converts a YUYV4:2:0 img to rgb
 void convert_YUYV_to_RGB(uint8_t *imgyuyv, uint8_t *imgrgb, int witdh, int 
 		height){
 	for(int i = 0; i < (witdh * height)/2; i++){
@@ -252,4 +220,32 @@ void convert_YUYV_to_RGB(uint8_t *imgyuyv, uint8_t *imgrgb, int witdh, int
 		imgrgb[rgbIdx + 4] = (uint8_t)rgb[1];   	      	
 		imgrgb[rgbIdx + 5] = (uint8_t)rgb[2];
 	}
+}
+
+bool set_framerate(int fd,int framerate){
+
+    struct v4l2_streamparm parm;
+
+    parm.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+    parm.parm.capture.timeperframe.numerator = 1;
+    parm.parm.capture.timeperframe.denominator = framerate;
+
+    int ret = xioctl(fd, VIDIOC_S_PARM, &parm);
+
+    if (ret < 0)
+    {
+        return false;
+    }
+
+    return true;
+}
+
+
+int xioctl(int fd, int request, void *arg)
+{
+    int r;
+	do r = ioctl (fd, request, arg);
+	while (-1 == r && EINTR == errno);
+	return r;
 }

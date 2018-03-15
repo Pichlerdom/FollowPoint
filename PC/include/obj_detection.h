@@ -4,7 +4,8 @@
 #include "followPoint.h"
 
 
-void find_delta(int fd, uint8_t *img_out, ImgCont *imgCont);
+
+int find_laser(float *img_div, uint8_t *img_disp, int *laserx, int *lasery, float threshold);
 
 void blur(uint8_t *img);
 

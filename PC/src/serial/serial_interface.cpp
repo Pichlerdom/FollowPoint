@@ -1,5 +1,4 @@
 
-
 #include <errno.h>
 #include <fcntl.h> 
 #include <string.h>
@@ -15,7 +14,7 @@ set_interface_attribs (int fd, int speed, int parity)
         memset (&tty, 0, sizeof tty);
         if (tcgetattr (fd, &tty) != 0)
         {
-                printf ("error %d from tcgetattr", errno);
+                printf ("error %d from tcgetattr\n", errno);
                 return -1;
         }
 
@@ -43,7 +42,7 @@ set_interface_attribs (int fd, int speed, int parity)
 
         if (tcsetattr (fd, TCSANOW, &tty) != 0)
         {
-                printf ("error %d from tcsetattr", errno);
+                printf ("error %d from tcsetattr\n", errno);
                 return -1;
         }
         return 0;
@@ -56,7 +55,7 @@ set_blocking (int fd, int should_block)
         memset (&tty, 0, sizeof tty);
         if (tcgetattr (fd, &tty) != 0)
         {
-                printf ("error %d from tggetattr", errno);
+                printf ("error %d from tggetattr\n", errno);
                 return;
         }
 
@@ -64,7 +63,7 @@ set_blocking (int fd, int should_block)
         tty.c_cc[VTIME] = 5;            // 0.5 seconds read timeout
 
         if (tcsetattr (fd, TCSANOW, &tty) != 0)
-                printf ("error %d setting term attributes", errno);
+                printf ("error %d setting term attributes\n", errno);
 }
 
 int
@@ -73,7 +72,7 @@ open_com_port(const char* portname){
 	int fd = open (portname, O_RDWR | O_NOCTTY | O_SYNC);
 	if (fd < 0)
 	{
-			printf ("error %d opening %s: %s", errno, portname, strerror (errno));
+			printf ("error %d opening %s: %s\n", errno, portname, strerror (errno));
 			return 0;
 	}
 
@@ -83,17 +82,25 @@ open_com_port(const char* portname){
 	return fd;
 }
 
-
-
 void
-write_delta(int fd, int8_t dx, int8_t dy){
-	int8_t buf[2];
+close_com_port(int fd){
+	close(fd);
+}
 
-	buf[0] = dx;
-	buf[1] = dy;
+int write_bytes(int fd, char *buffer, int size){
+	return write(fd, buffer,size);	
+}
 
-	printf("sending: %d, %d\n",dx,dy);
+void write_byte(int fd, char byte){
+	write(fd,&byte,1);
+}
 
-	write(fd, buf,2);
-	
+int read_bytes(int fd, char *buffer, int bytes_to_read){
+	return read(fd,buffer,bytes_to_read);
+}
+
+char readbyte(int fd){
+	char byte;
+	read(fd,&byte,1);
+	return byte;
 }

@@ -1,25 +1,18 @@
-
 #ifndef _WEBCAM_INTERFACE_H_
 #define _WEBCAM_INTERFACE_H_
+#include <stdint.h>
 
-#include "followPoint.h"
+int open_camera(char *file_name, int *width, int *height,uint8_t **frame_buf, int *frame_buf_size);
 
-#define DEFAULT_VIDEO_DEVICE "/dev/video1"
+void close_camera(int fd_cam);
 
+void fill_frame_buf_yuyv(int fd_camera, uint8_t *frame_buf);
 
-static int xioctl(int fd, int request, void *arg);
-
-int allocCamera(ImgCont *imgCont, uint8_t ** framebuf);
-
-void closeCamera(int fd_cam);
-
-void *main_capture_loop(void* args);
-
-void readframe(ImgCont *imgCont, int fd_camera, uint8_t *buf);
+void fill_read_frame_rgb(int fd_camera, uint8_t *frame_buf, uint8_t *imgrgb, int width, int height);
 
 void convert_YUYV_to_RGB(uint8_t *imgyuyv, uint8_t *imgrgb, int witdh, int height);
 
-void writeframebuf(uint8_t *framebuf, ImgCont *imgCont);
+bool set_framerate(int fd,int framerate);
 
+int xioctl(int fd, int request, void *arg);
 #endif
-

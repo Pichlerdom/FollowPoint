@@ -7,7 +7,8 @@
 #include <stdint.h>
 #include "followPoint.h"
 
-void cuda_test(ImgCont *imgCont,uint8_t *comp);
+void * main_detection_loop(void * arg);
 
-void update_comp(ImgCont *imgCont);
+void update_comp(uint8_t *comp, uint8_t *img,  int laserx , int lasery);
+
 #endif

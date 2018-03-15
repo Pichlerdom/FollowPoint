@@ -14,7 +14,7 @@ NVCFLAGS =-g -lineinfo -maxrregcount=0 -gencode=arch=compute_50,code=\"sm_50,com
 LFLAGS = -L"/usr/lib/x86_64-linux-gnu" 
 
 #define library names
-LIBS = -lcuda -lcudart -lSDL2 -lSDL2_image -lm -lpthread -lv4lconvert
+LIBS = -lcuda -lcudart -lSDL2 -lSDL2_image -lSDL2_ttf -lm -lpthread
 
 #define SDL2 Options
 SDL2CFLAGS = -D_REENRRANT
@@ -27,10 +27,10 @@ INCLUDES =-I../include $(SDL2INCLUDES) -I../libv4l/include
 OBJS = $(SRCS:.cpp=.o) $(NVSRCS:.cu=.o)
 
 # define the C source files
-SRCS = main.cpp webcam_interface.cpp follow_point_display.cpp serial_interface.cpp obj_detection.cpp 
+SRCS = main.cpp display/follow_point_display.cpp webcam/webcam_interface.cpp obj_detection/obj_detection.cpp serial/serial_interface.cpp 
 
 # define the cuda source files
-NVSRCS = obj_detection_cuda.cu obj_detection_kernel.cu
+NVSRCS = obj_detection/obj_detection_cuda.cu obj_detection/obj_detection_kernel.cu
 
 # define the executable file 
 MAIN = ../bin/followPoint
@@ -53,4 +53,8 @@ $(MAIN): $(OBJS)
 	$(NVCC) $(NVCFLAGS) $(INCLUDES) -c $< -o $@
 
 clean:
+	rm display/*.o
+	rm obj_detection/*.o
+	rm serial/*.o
+	rm webcam/*.o
 	rm *.o
